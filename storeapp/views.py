@@ -3,8 +3,9 @@ import sqlite3
 import os
 
 from flask import render_template, request, session, redirect, url_for, g, flash, abort
+from flask.ext.bcrypt import Bcrypt 
 
-from .forms import LoginForm
+from .forms import LoginForm, SignUpForm
 
 from storeapp import app 
 
@@ -49,13 +50,42 @@ def close_db(error):
 
 
 
+
 @app.route('/')
 def index():
 	db = get_db()
 	cur = db.execute('select title, author from books order by id desc')
-	entries = cur.fetchall()
+	books = cur.fetchall()
 
-	return render_template('index.html', entries=entries)
+	return render_template('index.html', books=books)
+
+@app.route('/signup-form')
+def signup_form():
+
+	return render_template('signup.html')
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+	form = SignUpForm()
+	username = request.form.get("username")
+	email = request.form.get("email")
+	password1 = request.form.get("password1")
+	password2 = request.form.get("password2")
+
+	if password1 != password2:
+		return redirect(url_for('signup'))
+
+	pw_hash = Bcrypt.generate_password_hash(password1).decode('utf-8')
+
+
+	db = get_db()
+	db.execute('insert into users (username, email, pw_hash) values (?, ?)', 
+		request.form['username'], request.form['email'], request.form['password1'])
+
+	return redirect(url_for('signup_form'))
+
+
+
 
 @app.route('/login', methods=('GET', 'POST'))
 def login():
@@ -76,27 +106,53 @@ def logout():
 @app.route('/members')
 def members():
 
+	if not session.get('logged_in'):
+		abort(401)
+
 	return render_template('members.html')
 
+@app.route('/books')
+def books():
 
+	db = get_db()
+	cur = db.execute('select title, author, category from entries order by id desc')
+	entries = cur.fetchall()
+
+
+	return render_template('books.html', entries=entries)
+
+@app.route('/add', methods=['POST'])
+def addbook():
+	if not session.get('logged_in'):
+		abort(401)
+	db = get_db()	
+	db.execute('insert into books (title, author, category) values (?, ?, ?)',
+				[request.form['title'], request.form['author'], request.form['category']])
+
+	db.commit()
+	flash('New book added!')
+	return redirect(url_for('books'))
+
+
+
+"""
 @app.route('/add', methods=['GET', 'POST'])
 def addbook():
 	if not session.get('logged_in'):
 		flash('You need to be logged in to access this page')
 		return redirect(url_for('login'))
 
-	db = get_db()
-	#db.execute('insert into books (title, author) values (?, ?)',
-				#[request.form['title'], request.form['author']])
+	form = AddBookForm()x`
+	if request.method == 'POST':
+		if form.validate_on_submit():
+			return redirect(url_for('books'))
 
-	#db.commit()
-	#flash('New book added!')
-	return render_template('add.html')
+	
+	return render_template('add.html', form=form)
 
-@app.route('/books')
-def books():
+"""
 
-	return render_template('books.html')
+
 
 
 

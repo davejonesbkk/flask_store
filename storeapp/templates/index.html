@@ -9,5 +9,16 @@
 
 	<h3><a href="/login">Login</a></h3>
 
+	{% if books %}
+
+	{% for book in books %}
+		<li><h3>{{ book.title }}</h3>
+	{% endfor %}
+
+	{% else %}
+		<p>No books</p>
+
+	{% endif %}
+
 
 {% endblock %}
