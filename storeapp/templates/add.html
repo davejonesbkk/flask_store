@@ -2,6 +2,14 @@
 
 {% block body %}
 
-	<p>Add Books Page</p>
+	<h3>Add Books Page</h3>
+
+	<form method="POST">
+	    {{ form.csrf_token }}
+	    {{ form.title.label }} {{ form.title(size=20) }}
+	    {{ form.author.label }} {{ form.author(size=20) }}
+	    {{ form.category.label }} {{ form.category(size=20) }}
+	    <input type="submit" name="add" value="Submit">
+	</form>
 
 {% endblock %}

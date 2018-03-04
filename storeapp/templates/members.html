@@ -4,10 +4,21 @@
 
 {% block body %}
 
-	<p>Success! You are logged in and in the members area now</p>
+	{% if session.logged_in %}
 
-	<h3><a href="/add">Add a Book</a></h3>
-	<h3><a href="/logout">Logout</a></h3>
+		<p>Success! You are logged in and in the members area now</p>
+
+		<h3><a href="/books">Add a Book</a></h3>
+		<h3><a href="/logout">Logout</a></h3>
+
+	{% else %}
+
+		<p>Your are not logged in please login via the link below</p>
+
+		<h3><a href="/login">Login</a></h3>
+		
+
+	{% endif %}
 
 
 

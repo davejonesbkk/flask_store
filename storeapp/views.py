@@ -1,11 +1,18 @@
 
 import sqlite3
-import os
+import os, base64
 
 from flask import render_template, request, session, redirect, url_for, g, flash, abort
-from flask.ext.bcrypt import Bcrypt 
+
 
 from .forms import LoginForm, SignUpForm
+
+from .dbhelper import DBHelper 
+
+from .passwdbuilder import PassBuilder 
+
+DB = DBHelper()
+PB = PassBuilder()
 
 from storeapp import app 
 
@@ -59,42 +66,64 @@ def index():
 
 	return render_template('index.html', books=books)
 
-@app.route('/signup-form')
-def signup_form():
-
-	return render_template('signup.html')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+
 	form = SignUpForm()
-	username = request.form.get("username")
-	email = request.form.get("email")
-	password1 = request.form.get("password1")
-	password2 = request.form.get("password2")
-
-	if password1 != password2:
-		return redirect(url_for('signup'))
-
-	pw_hash = Bcrypt.generate_password_hash(password1).decode('utf-8')
+	if request.method == 'POST':
+		if form.validate_on_submit():
+			username = request.form.get("username")
+			email = request.form.get("email")
+			password1 = request.form.get("password1")
+			password2 = request.form.get("password2")
 
 
-	db = get_db()
-	db.execute('insert into users (username, email, pw_hash) values (?, ?)', 
-		request.form['username'], request.form['email'], request.form['password1'])
+			if password1 != password2:
+				flash('Sorry your passwords must match, please try again')
+				return redirect(url_for('signup'))
+				
+			#check username isnt already taken
+			if DB.get_users(username):
+				flash('Sorry that username is taken, please choose another')
+				return redirect(url_for('signup'))
 
-	return redirect(url_for('signup_form'))
+
+			salt = PB.SaltBuilder()
+			print(salt)
+
+			hashed_pw = PB.HashBuilder(password1) + salt
+			print(hashed_pw)
+
+			db = get_db()	
+			db.execute('insert into users (username, email, password) values (?, ?, ?)',
+				[username, email, hashed_pw])
+
+			db.commit()
+
+			flash('Thanks for registering')
+
+			return redirect(url_for('index'))
+
+
+	return render_template('signup.html', form=form)
 
 
 
 
 @app.route('/login', methods=('GET', 'POST'))
 def login():
-	form = LoginForm()
-	if request.method == 'POST':
-		if form.validate_on_submit():
-			session['logged_in'] = True
-			flash('You were logged in')
-			return redirect(url_for('members'))
+	form = LoginForm(request.form)
+	if request.method == 'POST' and form.validate():
+		username = request.form.get("username")
+		password = request.get("password")
+		user = User(username, password)
+
+
+
+		session['logged_in'] = True
+		flash('You were logged in')
+		return redirect(url_for('members'))
 	return render_template('login.html', form=form)
 
 @app.route('/logout')
@@ -115,11 +144,11 @@ def members():
 def books():
 
 	db = get_db()
-	cur = db.execute('select title, author, category from entries order by id desc')
-	entries = cur.fetchall()
+	cur = db.execute('select title, author, category from books order by id desc')
+	books = cur.fetchall()
 
 
-	return render_template('books.html', entries=entries)
+	return render_template('books.html', books=books)
 
 @app.route('/add', methods=['POST'])
 def addbook():
@@ -133,24 +162,21 @@ def addbook():
 	flash('New book added!')
 	return redirect(url_for('books'))
 
+@app.route('/users')
+def showusers():
+	#if not session.get('logged_in'):
+		#abort(401)
+	db = get_db()
+	cur = db.execute('select username from users order by id desc')
+	members = cur.fetchall() 
+
+	return render_template('users.html', members=members)
 
 
-"""
-@app.route('/add', methods=['GET', 'POST'])
-def addbook():
-	if not session.get('logged_in'):
-		flash('You need to be logged in to access this page')
-		return redirect(url_for('login'))
 
-	form = AddBookForm()x`
-	if request.method == 'POST':
-		if form.validate_on_submit():
-			return redirect(url_for('books'))
 
-	
-	return render_template('add.html', form=form)
 
-"""
+
 
 
 
