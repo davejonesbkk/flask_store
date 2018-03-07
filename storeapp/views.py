@@ -4,6 +4,7 @@ import os, base64
 
 from flask import render_template, request, session, redirect, url_for, g, flash, abort
 
+import flask_bcrypt as Bcrypt
 
 from .forms import LoginForm, SignUpForm
 
@@ -70,6 +71,10 @@ def index():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
 
+	db = get_db()	
+
+	cur = db.cursor()
+
 	form = SignUpForm()
 	if request.method == 'POST':
 		if form.validate_on_submit():
@@ -83,10 +88,6 @@ def signup():
 				flash('Sorry your passwords must match, please try again')
 				return redirect(url_for('signup'))
 				
-			#check username isnt already taken
-			if DB.get_users(username):
-				flash('Sorry that username is taken, please choose another')
-				return redirect(url_for('signup'))
 
 
 			salt = PB.SaltBuilder()
@@ -95,15 +96,19 @@ def signup():
 			hashed_pw = PB.HashBuilder(password1) + salt
 			print(hashed_pw)
 
-			db = get_db()	
-			db.execute('insert into users (username, email, password) values (?, ?, ?)',
-				[username, email, hashed_pw])
+			try:
+			
+				db.execute('insert into users (username, email, password) values (?, ?, ?)',
+					[username, email, hashed_pw])
 
-			db.commit()
+				db.commit()
 
-			flash('Thanks for registering')
+				flash('Thanks for registering')
 
-			return redirect(url_for('index'))
+				return redirect(url_for('index'))
+
+			except sqlite3.IntegrityError:
+				flash('Username already taken')
 
 
 	return render_template('signup.html', form=form)
@@ -113,18 +118,39 @@ def signup():
 
 @app.route('/login', methods=('GET', 'POST'))
 def login():
+
 	form = LoginForm(request.form)
-	if request.method == 'POST' and form.validate():
+	if request.method == 'POST':
 		username = request.form.get("username")
-		password = request.get("password")
-		user = User(username, password)
-
-
-
-		session['logged_in'] = True
-		flash('You were logged in')
-		return redirect(url_for('members'))
+		password = request.form.get("password")
+		completion = validate(username, password)
+		if completion == False:
+			flash('Invalid login, please try again. Are you registered?')
+		else:
+			return redirect(url_for('members'))
 	return render_template('login.html', form=form)
+
+def validate(username, password):
+	print('Inside validate')
+	db = get_db()
+	completion = False
+	with db:
+		cur = db.cursor()
+		cur.execute('SELECT * FROM users')
+		rows = cur.fetchall()
+		for row in rows:
+			dbUser = row[1]
+			print(dbUser)
+			dbPass = row[3]
+			print(dbPass)
+			if dbUser==username:
+				if Bcrypt.check_password_hash(dbPass, password) == True:
+					completion == True
+			else:
+				flash('Invalid login!')
+	return completion
+
+
 
 @app.route('/logout')
 def logout():
@@ -150,7 +176,7 @@ def books():
 
 	return render_template('books.html', books=books)
 
-@app.route('/add', methods=['POST'])
+@app.route('/add', methods=['GET','POST'])
 def addbook():
 	if not session.get('logged_in'):
 		abort(401)
