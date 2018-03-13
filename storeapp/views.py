@@ -4,7 +4,7 @@ import os, base64
 
 from flask import render_template, request, session, redirect, url_for, g, flash, abort
 
-import flask_bcrypt as Bcrypt
+import flask_bcrypt as bcrypt
 
 from .forms import LoginForm, SignUpForm
 
@@ -13,9 +13,9 @@ from .dbhelper import DBHelper
 from .passwdbuilder import PassBuilder 
 
 DB = DBHelper()
-PB = PassBuilder()
+#PB = PassBuilder()
 
-from storeapp import app 
+from storeapp import app
 
 app.config.update(dict(
 	DATABASE=os.path.join(app.root_path, 'store.db'),
@@ -90,11 +90,7 @@ def signup():
 				
 
 
-			salt = PB.SaltBuilder()
-			print(salt)
-
-			hashed_pw = PB.HashBuilder(password1) + salt
-			print(hashed_pw)
+			hashed_pw = bcrypt.generate_password_hash(password1)
 
 			try:
 			
@@ -127,6 +123,8 @@ def login():
 		if completion == False:
 			flash('Invalid login, please try again. Are you registered?')
 		else:
+			flash('Logged in!')
+			session['logged_in'] = True
 			return redirect(url_for('members'))
 	return render_template('login.html', form=form)
 
@@ -140,14 +138,19 @@ def validate(username, password):
 		rows = cur.fetchall()
 		for row in rows:
 			dbUser = row[1]
+			print(username)
 			print(dbUser)
 			dbPass = row[3]
+			print(password)
 			print(dbPass)
 			if dbUser==username:
-				if Bcrypt.check_password_hash(dbPass, password) == True:
-					completion == True
-			else:
-				flash('Invalid login!')
+				validate_pw = bcrypt.check_password_hash(dbPass, password)
+				print(validate_pw)
+				if validate_pw == True:
+					completion = True
+					return completion
+			#else:
+				#flash('Invalid login!')
 	return completion
 
 
