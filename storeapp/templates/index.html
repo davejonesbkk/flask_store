@@ -7,7 +7,19 @@
 
 	<p>The Index Page</p>
 
+	 {% if not session.logged_in %}
+
 	<h3><a href="/login">Login</a></h3>
+
+	<p>You will need to be a registered user to login</p>
+
+	<h3><a href="/signup">Register Here</a></h3>
+
+	{% else %}
+
+	<h3><a href="/logout">Logout</a></h3>
+
+	{% endif %}
 
 	{% if books %}
 
@@ -20,7 +32,7 @@
 
 	{% endif %}
 
-	<h3><a href="/signup">Register Here</a></h3>
+	
 
 
 {% endblock %}

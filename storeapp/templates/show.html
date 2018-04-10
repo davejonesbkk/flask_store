@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+<p>The Show Page</p>
+
+{% if photo %}
+
+	{% for m in photo %}
+	
+
+		<p>{{ m.photo }}</p>
+		<p>{{ m.url }}</p>
+
+	{% endfor %}
+
+{% endif %}
+
+{% endblock %}
+

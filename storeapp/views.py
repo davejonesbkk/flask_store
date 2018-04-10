@@ -4,18 +4,24 @@ import os, base64
 
 from flask import render_template, request, session, redirect, url_for, g, flash, abort
 
+from flask.ext.uploads import UploadSet, configure_uploads, IMAGES, UploadNotAllowed
+
 import flask_bcrypt as bcrypt
 
-from .forms import LoginForm, SignUpForm
+from .forms import LoginForm, SignUpForm, AddBookForm
 
-from .dbhelper import DBHelper 
+from flask_wtf.file import FileField, FileRequired
+from werkzeug.utils import secure_filename
 
-from .passwdbuilder import PassBuilder 
-
-DB = DBHelper()
-#PB = PassBuilder()
 
 from storeapp import app
+
+#UPLOAD_FOLDER = os.path.basename('uploads')
+#app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+photos = UploadSet('photos', IMAGES, default_dest=lambda app: os.path.basename('uploads'))
+configure_uploads(app, (photos,))
+
 
 app.config.update(dict(
 	DATABASE=os.path.join(app.root_path, 'store.db'),
@@ -183,13 +189,35 @@ def books():
 def addbook():
 	if not session.get('logged_in'):
 		abort(401)
-	db = get_db()	
-	db.execute('insert into books (title, author, category) values (?, ?, ?)',
-				[request.form['title'], request.form['author'], request.form['category']])
 
-	db.commit()
-	flash('New book added!')
-	return redirect(url_for('books'))
+	form = AddBookForm(request.form)
+	if request.method == 'POST':
+		#if form.validate_on_submit():
+		title = request.form.get("title")
+		author = request.form.get("author")
+		category = request.form.get("category")
+		imagefile = photos.save(request.files["image"])
+		#imagefile = request.form.image.data
+		print(imagefile)
+		rec = Photo(imagefile=imagefile, user=g.user.id)
+		rec.store()
+		flash("Photo saved")
+		#filename = secure_filename(imagefile.filename)
+		#print(filename)
+		#imagefile.save(os.path.join(
+			#app.config['UPLOAD_FOLDER'], filename))
+		db = get_db()	
+		db.execute('insert into books (title, author, category, image) values (?, ?, ?)',
+				[request.form['title'], request.form['author'], request.form['category'], filename])
+
+		db.commit()
+		flash('New book added!')
+
+		return render_template('add.html', form=form)
+
+
+	
+	return render_template('add.html', form=form)
 
 @app.route('/users')
 def showusers():
@@ -200,6 +228,29 @@ def showusers():
 	members = cur.fetchall() 
 
 	return render_template('users.html', members=members)
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    if request.method == 'POST' and 'image' in request.files:
+        filename = photos.save(request.files['image'])
+        rec = Photo(filename=filename, user=g.user.id)
+        rec.store()
+        flash("Photo saved.")
+        return redirect(url_for('show', id=rec.id))
+    return render_template('upload.html')
+
+@app.route('/photo/<id>')
+def show(id):
+    photo = Photo.load(id)
+    if photo is None:
+        abort(404)
+    url = photos.url(photo.filename)
+    return render_template('show.html', url=url, photo=photo)
+
+
+
+
+
 
 
 
