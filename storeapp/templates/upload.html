@@ -2,12 +2,10 @@
 
 {% block body %}
 
-	<form action="/upload" method="post" enctype="multipart/form-data" >
-      <span class="btn btn-default btn-file">
-        Browse <input type="file" name="image">
-      </span>
-
-    <input type="submit" value="Upload your image" class="btn btn-primary">
-  </form>
+    <h1>Upload new File</h1>
+    <form method=post enctype=multipart/form-data>
+      <p><input type=file name=file>
+         <input type=submit value=Upload>
+    </form>
 
 {% endblock %}

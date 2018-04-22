@@ -2,19 +2,22 @@
 
 {% block body %}
 
-<p>The Show Page</p>
+<p>The Show Images Page</p>
 
-{% if photo %}
+{% if filename %}
 
-	{% for m in photo %}
-	
+	<p>The Filename</p>
 
-		<p>{{ m.photo }}</p>
-		<p>{{ m.url }}</p>
+	<p>{{ filename }}</p>
+      
+    <img src="{{url_for('send_file', filename=filename)}}">
 
-	{% endfor %}
+{% else %}
 
-{% endif %}
+	<h3>No image!</h3>
+        
+
+ {% endif %}
 
 {% endblock %}
 

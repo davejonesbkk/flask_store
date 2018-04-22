@@ -2,7 +2,7 @@
 import sqlite3
 import os, base64
 
-from flask import render_template, request, session, redirect, url_for, g, flash, abort
+from flask import render_template, request, session, redirect, url_for, g, flash, abort, send_from_directory
 
 from flask.ext.uploads import UploadSet, configure_uploads, IMAGES, UploadNotAllowed
 
@@ -17,10 +17,11 @@ from werkzeug.utils import secure_filename
 from storeapp import app
 
 #UPLOAD_FOLDER = os.path.basename('uploads')
-#app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+UPLOAD_FOLDER = '/Users/david/documents/projects/flask_store/uploads'
+ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
 
-photos = UploadSet('photos', IMAGES, default_dest=lambda app: os.path.basename('uploads'))
-configure_uploads(app, (photos,))
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 
 
 app.config.update(dict(
@@ -229,24 +230,46 @@ def showusers():
 
 	return render_template('users.html', members=members)
 
+
+def allowed_file(filename):
+	return '.' in filename and \
+		filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 @app.route('/upload', methods=['GET', 'POST'])
-def upload():
-    if request.method == 'POST' and 'image' in request.files:
-        filename = photos.save(request.files['image'])
-        rec = Photo(filename=filename, user=g.user.id)
-        rec.store()
-        flash("Photo saved.")
-        return redirect(url_for('show', id=rec.id))
-    return render_template('upload.html')
+def upload_file():
+	if request.method == 'POST':
+		#check if the post request has the file part
+		if 'file' not in request.files:
+			flash('No file part')
+			return redirect(request.url)
+		file = request.files['file']
+		#if user does not select file, browser also
+		# submit a empty part without filename
+		if file.filename == '':
+			flash('No selected file')
+			return redirect(request.url)
+		if file and allowed_file(file.filename):
+			filename = secure_filename(file.filename)
+			file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-@app.route('/photo/<id>')
-def show(id):
-    photo = Photo.load(id)
-    if photo is None:
-        abort(404)
-    url = photos.url(photo.filename)
-    return render_template('show.html', url=url, photo=photo)
+			return redirect(url_for('send_file', filename=filename))
+		
 
+	return render_template('upload.html')
+
+
+@app.route('/show/<filename>')
+def uploaded_file(filename):
+	
+	return render_template('show.html', filename=filename)
+
+@app.route('/uploads/<filename>')
+def send_file(filename):
+	return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+
+ 
 
 
 
