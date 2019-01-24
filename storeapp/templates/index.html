@@ -26,8 +26,8 @@
 	<ul class="books">
   		{% for book in books %}
   	<h2>{{ book.title }}</h2>
-  		<p>{{ book.author }}<br>{{ book.category }}</p>
-  		<img src="{{ book.image }}"" height="360" width="250">
+  		<p>{{ book.author }}<br>{{ book.category }}<br>{{ book.image }}</p>
+  		<img src="uploads/{{ book.image }}"" height="360" width="250">
  	 	{% else %}
   	<h3>No books available</h3>
   		{% endfor %}
