@@ -23,11 +23,18 @@
 
 	{% if books %}
 
-	{% for book in books %}
-		<li><h3>{{ book.title }}</h3>
-	{% endfor %}
+	<ul class="books">
+  		{% for book in books %}
+  	<h2>{{ book.title }}</h2>
+  		<p>{{ book.author }}<br>{{ book.category }}</p>
+  		<img src="{{ book.image }}"" height="360" width="250">
+ 	 	{% else %}
+  	<h3>No books available</h3>
+  		{% endfor %}
+  	</ul>
 
 	{% else %}
+
 		<p>No books</p>
 
 	{% endif %}

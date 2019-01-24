@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 
 from storeapp import app
 
-#UPLOAD_FOLDER = os.path.basename('uploads')
+
 UPLOAD_FOLDER = '/Users/david/documents/projects/flask_store/uploads'
 ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
 
@@ -69,7 +69,7 @@ def close_db(error):
 @app.route('/')
 def index():
 	db = get_db()
-	cur = db.execute('select title, author from books order by id desc')
+	cur = db.execute('select title, author, category, image from books order by id desc')
 	books = cur.fetchall()
 
 	return render_template('index.html', books=books)
@@ -197,24 +197,29 @@ def addbook():
 		title = request.form.get("title")
 		author = request.form.get("author")
 		category = request.form.get("category")
-		imagefile = photos.save(request.files["image"])
-		#imagefile = request.form.image.data
-		print(imagefile)
-		rec = Photo(imagefile=imagefile, user=g.user.id)
-		rec.store()
-		flash("Photo saved")
-		#filename = secure_filename(imagefile.filename)
-		#print(filename)
-		#imagefile.save(os.path.join(
-			#app.config['UPLOAD_FOLDER'], filename))
+		
+		image = request.files['image']
+		if image.filename == '':
+			flash('No selected image')
+			return redirect(request.url)
+	
+		if image and allowed_file(image.filename):
+			filename = secure_filename(image.filename)
+			image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+		print(filename)
+
+
+		flash("Image saved")
+		
 		db = get_db()	
-		db.execute('insert into books (title, author, category, image) values (?, ?, ?)',
+		db.execute('insert into books (title, author, category, image) values (?, ?, ?, ?)',
 				[request.form['title'], request.form['author'], request.form['category'], filename])
 
 		db.commit()
 		flash('New book added!')
 
-		return render_template('add.html', form=form)
+		return redirect(url_for('index'))
 
 
 	
@@ -222,8 +227,9 @@ def addbook():
 
 @app.route('/users')
 def showusers():
-	#if not session.get('logged_in'):
-		#abort(401)
+	if not session.get('logged_in'):
+		flash("Must be logged in")
+		abort(401)
 	db = get_db()
 	cur = db.execute('select username from users order by id desc')
 	members = cur.fetchall() 
@@ -252,7 +258,7 @@ def upload_file():
 			filename = secure_filename(file.filename)
 			file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-			return redirect(url_for('send_file', filename=filename))
+			return redirect(url_for('uploaded_file', filename=filename))
 		
 
 	return render_template('upload.html')
@@ -260,13 +266,13 @@ def upload_file():
 
 @app.route('/show/<filename>')
 def uploaded_file(filename):
-	
+	filename = 'http://127.0.0.1:5000/uploads/' + filename 
 	return render_template('show.html', filename=filename)
 
 @app.route('/uploads/<filename>')
 def send_file(filename):
-	return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
+	#return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+	return send_from_directory(UPLOAD_FOLDER, filename)
 
 
  
