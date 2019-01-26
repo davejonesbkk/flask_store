@@ -2,20 +2,27 @@
 import sqlite3
 import os, base64
 
-from flask import render_template, request, session, redirect, url_for, g, flash, abort
+from flask import render_template, request, session, redirect, url_for, g, flash, abort, send_from_directory
 
-import flask_bcrypt as Bcrypt
+from flask.ext.uploads import UploadSet, configure_uploads, IMAGES, UploadNotAllowed
 
-from .forms import LoginForm, SignUpForm
+import flask_bcrypt as bcrypt
 
-from .dbhelper import DBHelper 
+from .forms import LoginForm, SignUpForm, AddBookForm
 
-from .passwdbuilder import PassBuilder 
+from flask_wtf.file import FileField, FileRequired
+from werkzeug.utils import secure_filename
 
-DB = DBHelper()
-PB = PassBuilder()
 
-from storeapp import app 
+from storeapp import app
+
+
+UPLOAD_FOLDER = '/Users/david/documents/projects/flask_store/uploads'
+ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+
 
 app.config.update(dict(
 	DATABASE=os.path.join(app.root_path, 'store.db'),
@@ -62,7 +69,7 @@ def close_db(error):
 @app.route('/')
 def index():
 	db = get_db()
-	cur = db.execute('select title, author from books order by id desc')
+	cur = db.execute('select title, author, category, image from books order by id desc')
 	books = cur.fetchall()
 
 	return render_template('index.html', books=books)
@@ -90,11 +97,7 @@ def signup():
 				
 
 
-			salt = PB.SaltBuilder()
-			print(salt)
-
-			hashed_pw = PB.HashBuilder(password1) + salt
-			print(hashed_pw)
+			hashed_pw = bcrypt.generate_password_hash(password1)
 
 			try:
 			
@@ -127,6 +130,8 @@ def login():
 		if completion == False:
 			flash('Invalid login, please try again. Are you registered?')
 		else:
+			flash('Logged in!')
+			session['logged_in'] = True
 			return redirect(url_for('members'))
 	return render_template('login.html', form=form)
 
@@ -140,14 +145,19 @@ def validate(username, password):
 		rows = cur.fetchall()
 		for row in rows:
 			dbUser = row[1]
+			print(username)
 			print(dbUser)
 			dbPass = row[3]
+			print(password)
 			print(dbPass)
 			if dbUser==username:
-				if Bcrypt.check_password_hash(dbPass, password) == True:
-					completion == True
-			else:
-				flash('Invalid login!')
+				validate_pw = bcrypt.check_password_hash(dbPass, password)
+				print(validate_pw)
+				if validate_pw == True:
+					completion = True
+					return completion
+			#else:
+				#flash('Invalid login!')
 	return completion
 
 
@@ -180,23 +190,96 @@ def books():
 def addbook():
 	if not session.get('logged_in'):
 		abort(401)
-	db = get_db()	
-	db.execute('insert into books (title, author, category) values (?, ?, ?)',
-				[request.form['title'], request.form['author'], request.form['category']])
 
-	db.commit()
-	flash('New book added!')
-	return redirect(url_for('books'))
+	form = AddBookForm(request.form)
+	if request.method == 'POST':
+		#if form.validate_on_submit():
+		title = request.form.get("title")
+		author = request.form.get("author")
+		category = request.form.get("category")
+		
+		image = request.files['image']
+		if image.filename == '':
+			flash('No selected image')
+			return redirect(request.url)
+	
+		if image and allowed_file(image.filename):
+			filename = secure_filename(image.filename)
+			image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+		print(filename)
+
+
+		flash("Image saved")
+		
+		db = get_db()	
+		db.execute('insert into books (title, author, category, image) values (?, ?, ?, ?)',
+				[request.form['title'], request.form['author'], request.form['category'], filename])
+
+		db.commit()
+		flash('New book added!')
+
+		return redirect(url_for('index'))
+
+
+	
+	return render_template('add.html', form=form)
 
 @app.route('/users')
 def showusers():
-	#if not session.get('logged_in'):
-		#abort(401)
+	if not session.get('logged_in'):
+		flash("Must be logged in")
+		abort(401)
 	db = get_db()
 	cur = db.execute('select username from users order by id desc')
 	members = cur.fetchall() 
 
 	return render_template('users.html', members=members)
+
+
+def allowed_file(filename):
+	return '.' in filename and \
+		filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload_file():
+	if request.method == 'POST':
+		#check if the post request has the file part
+		if 'file' not in request.files:
+			flash('No file part')
+			return redirect(request.url)
+		file = request.files['file']
+		#if user does not select file, browser also
+		# submit a empty part without filename
+		if file.filename == '':
+			flash('No selected file')
+			return redirect(request.url)
+		if file and allowed_file(file.filename):
+			filename = secure_filename(file.filename)
+			file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+			return redirect(url_for('uploaded_file', filename=filename))
+		
+
+	return render_template('upload.html')
+
+
+@app.route('/show/<filename>')
+def uploaded_file(filename):
+	filename = 'http://127.0.0.1:5000/uploads/' + filename 
+	return render_template('show.html', filename=filename)
+
+@app.route('/uploads/<filename>')
+def send_file(filename):
+	#return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+	return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+ 
+
+
+
+
 
 
 

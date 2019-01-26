@@ -1,5 +1,7 @@
 #exclude all files from __pycache__
-__pycache__/*
-
-#exclude all files from virtualenv directory
 env/*
+env/
+.env
+__pycache__/*
+uploads/*
+storeapp/store.db

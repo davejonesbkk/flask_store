@@ -1,6 +1,8 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired
+from flask_wtf.file import FileField, FileRequired
+from werkzeug.utils import secure_filename
 
 
 class LoginForm(FlaskForm):
@@ -14,3 +16,9 @@ class SignUpForm(FlaskForm):
 	password2 = PasswordField('Password2', validators=[DataRequired()])
 	
 
+class AddBookForm(FlaskForm):
+	title = StringField('Title', validators=[DataRequired()])
+	author = StringField('Author', validators=[DataRequired()])
+	category = StringField('Category', validators=[DataRequired()])
+	image = FileField('Image', validators=[FileRequired()])
+	

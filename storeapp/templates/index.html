@@ -7,20 +7,39 @@
 
 	<p>The Index Page</p>
 
+	 {% if not session.logged_in %}
+
 	<h3><a href="/login">Login</a></h3>
+
+	<p>You will need to be a registered user to login</p>
+
+	<h3><a href="/signup">Register Here</a></h3>
+
+	{% else %}
+
+	<h3><a href="/logout">Logout</a></h3>
+
+	{% endif %}
 
 	{% if books %}
 
-	{% for book in books %}
-		<li><h3>{{ book.title }}</h3>
-	{% endfor %}
+	<ul class="books">
+  		{% for book in books %}
+  	<h2>{{ book.title }}</h2>
+  		<p>{{ book.author }}<br>{{ book.category }}<br>{{ book.image }}</p>
+  		<img src="uploads/{{ book.image }}"" height="360" width="250">
+ 	 	{% else %}
+  	<h3>No books available</h3>
+  		{% endfor %}
+  	</ul>
 
 	{% else %}
+
 		<p>No books</p>
 
 	{% endif %}
 
-	<h3><a href="/signup">Register Here</a></h3>
+	
 
 
 {% endblock %}
