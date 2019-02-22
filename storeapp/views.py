@@ -2,7 +2,7 @@
 import sqlite3
 import os, base64
 
-from flask import render_template, request, session, redirect, url_for, g, flash, abort, send_from_directory
+from flask import render_template, request, session, redirect, url_for, g, flash, abort, send_from_directory, jsonify
 
 from flask.ext.uploads import UploadSet, configure_uploads, IMAGES, UploadNotAllowed
 
@@ -12,9 +12,11 @@ from .forms import LoginForm, SignUpForm, AddBookForm
 
 from flask_wtf.file import FileField, FileRequired
 from werkzeug.utils import secure_filename
-
-
 from storeapp import app
+from flask_mail import Mail, Message
+from celery import Celery 
+
+from datetime import datetime
 
 
 UPLOAD_FOLDER = '/Users/david/documents/projects/flask_store/uploads'
@@ -22,10 +24,29 @@ ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+app.config['MAIL_SERVER']='smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USERNAME'] = os.environ['EMAIL_USER']
+app.config['MAIL_PASSWORD'] = os.environ['EMAIL_PASSWORD']
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+mail = Mail(app)
 
+app.config.update(
+	CELERY_BROKER_URL='redis://localhost:6379',
+	result_backend='redis://localhost:6379'
+)
+
+#Seetting serialization for passing mail messages to Celery
+app.config.update(
+accept_content=['json','pickle']
+)
+
+celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+celery.conf.update(app.config)
 
 app.config.update(dict(
-	DATABASE=os.path.join(app.root_path, 'store.db'),
+	DATABASE=os.path.join(app.root_path, '/Users/david/documents/projects/flask_store/store.db'),
 	SECRET_KEY='vqE/O0iNhARuC1e6c9AM9mg0C2DLUGkHfrZDwN3/qgHJFdYP14TRmIuZngPrrwKVd1KcD+KfyEkh/yxxkPyi5nhlyk8OF32wC6HM',
 	USERNAME='admin',
 	PASSWORD='default'
@@ -273,6 +294,44 @@ def uploaded_file(filename):
 def send_file(filename):
 	#return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 	return send_from_directory(UPLOAD_FOLDER, filename)
+
+@app.route("/testmail")
+def testmail():
+	msg = Message("Hello", sender = os.environ['EMAIL_USER'], recipients = ['davejonesbkk@gmail.com'])
+	msg.body = "Hello Flask message sent from Flask-Mail"
+	mail.send(msg)
+	return "Sent"
+
+@app.route("/sendmail", methods=['GET', 'POST'])
+def sendmail():
+	if request.method == 'GET':
+		return render_template('sendmail.html', email=session.get('email', ''))
+	email = request.form['email']
+	session['email'] = email 
+
+	#send the email
+	msg = Message('Hello from Flask',
+					recipients=[request.form['email']])
+
+	msg.body = 'Test email sent with Celery task'
+	if request.form['submit'] == 'Send':
+		#send right away
+		send_async_email.delay(msg)
+		flash('Sending email to {0}'.format(email))
+	else:
+		#send in one minute
+		send_async_email.apply_async(args=[msg], countdown=60)
+		flash('Email will be sent to {0} in 1 minute'.format(email))
+
+	return redirect(url_for('sendmail'))
+
+
+@celery.task(serializer='pickle')
+def send_async_email(msg):
+	#background celery task
+	with app.app_context():
+		mail.send(msg)
+
 
 
  
